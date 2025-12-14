@@ -1,5 +1,129 @@
 # Changelog
 
+## 3.0.0
+
+### Major Changes
+
+- abbdd89: Add Deals Protocol for inventory package discovery and activation.
+
+  **New Protocol:**
+
+  - Deals Protocol enables buyer agents to discover and activate pre-packaged and ad-hoc inventory deal packages from SSPs and curation platforms
+  - Alternative to Media Buy Protocol for package-based buying
+
+  **Tasks:**
+
+  - `get_deals`: Discover deal packages using natural language descriptions
+  - `activate_deal`: Activate deals on SSP platforms
+
+  **Core Schemas:**
+
+  - `deal.json`: Deal package with pricing, targeting, and platform availability
+  - `deal-pricing.json`: Pricing configuration with Floor, Fixed, and Market types, plus optional margins for curated deals
+  - `deal-targeting.json`: Targeting parameters including geo, devices, allow/block lists, and segments
+
+  **Deal Types:**
+
+  - **PMP (Private Marketplace)**: Direct deals with fixed or floor pricing
+  - **Curated**: Enhanced inventory packages with margin-based pricing
+
+  **Architecture:**
+
+  - Deals Agents integrate with Signals Agents (using Signals Protocol) to include audience targeting
+  - Buyer Agents interact with Deals Agents (using Deals Protocol) without directly accessing Signals Agents
+  - Parallel architecture to Media Buy Protocol's Sales Agent integration
+
+  **Documentation:**
+
+  - Protocol overview and specification
+  - Task reference documentation
+  - Integration examples with Signals Protocol
+  - Renamed from Curation Protocol to Deals Protocol
+
+### Minor Changes
+
+- c776474: Align Deals Protocol with Media Buy Protocol patterns for consistency across AdCP.
+
+  **New features:**
+
+  - Added `deal-filters.json` schema with structured filtering capabilities (deal_type, ad_type, platforms, date ranges, status, countries, devices)
+  - Added `brand_manifest` support to `get_deals` request (optional, inline or URL reference)
+  - Added `ext` extension field support to all Deals protocol requests and responses
+  - Added `filters` parameter to `get_deals` for structured deal discovery
+
+  **Breaking changes:**
+
+  - Renamed `deal_spec` to `brief` in `get_deals` request to match `get_products` pattern
+  - Made all `get_deals` request fields optional (removed `required: ["deal_spec"]`)
+
+  **Improvements:**
+
+  - Updated all `context` fields to use `$ref` to `/schemas/core/context.json` instead of inline definitions
+  - Added `ext` field references to both success and error variants in discriminated union responses
+  - Improved schema consistency across all Deals protocol tasks
+
+  **Migration guide:**
+
+  ```javascript
+  // Before
+  await client.getDeals({ deal_spec: "Premium video deals" });
+
+  // After
+  await client.getDeals({ brief: "Premium video deals" });
+
+  // New capabilities
+  await client.getDeals({
+    brief: "Premium video deals",
+    filters: {
+      deal_type: ["Curated"],
+      ad_type: ["Video"],
+      countries: ["US", "CA"],
+    },
+    brand_manifest: "https://example.com/brand.json",
+  });
+  ```
+
+### Patch Changes
+
+- 72a5802: Fix semantic version sorting for agreements. When multiple agreement versions share the same effective date, the system now correctly selects the highest version (e.g., 1.1.1 before 1.1).
+- 10d5b6a: Fix analytics dashboard revenue tracking with Stripe webhook customer linkage
+- 64b08a1: Redesign how AdCP handles push notifications for async tasks. The key change is separating **what data is sent** (AdCP's responsibility) from **how it's delivered** (protocol's responsibility).
+
+  **Renamed:**
+
+  - `webhook-payload.json` → `mcp-webhook-payload.json` (clarifies this envelope is MCP-specific)
+
+  **Created:**
+
+  - `async-response-data.json` - Union schema for all async response data types
+  - Status-specific schemas for `working`, `input-required`, and `submitted` statuses
+
+  **Deleted:**
+
+  - Removed redundant `-async-response-completed.json` and `-async-response-failed.json` files (6 total)
+  - For `completed`/`failed`, we now use the existing task response schemas directly
+
+  **Before:** The webhook spec tried to be universal, which created confusion about how A2A's native push notifications fit in.
+
+  **After:**
+
+  - MCP uses `mcp-webhook-payload.json` as its envelope, with AdCP data in `result`
+  - A2A uses its native `Task`/`TaskStatusUpdateEvent` messages, with AdCP data in `status.message.parts[].data`
+  - Both use the **exact same data schemas** - only the envelope differs
+
+  This makes it clear that AdCP only specifies the data layer, while each protocol handles delivery in its own way.
+
+  **Schemas:**
+
+  - `static/schemas/source/core/mcp-webhook-payload.json` (renamed + simplified)
+  - `static/schemas/source/core/async-response-data.json` (new)
+  - `static/schemas/source/media-buy/*-async-response-*.json` (6 deleted, 9 remain)
+
+  - Clarified that both MCP and A2A use HTTP webhooks (A2A's is native to the spec, MCP's is AdCP-provided)
+  - Fixed webhook trigger rules: webhooks fire for **all status changes** if `pushNotificationConfig` is provided and the task runs async
+  - Added proper A2A webhook payload examples (`Task` vs `TaskStatusUpdateEvent`)
+  - **Task Management** added to sidebar, it was missing
+
 ## 2.5.0
 
 ### Minor Changes
